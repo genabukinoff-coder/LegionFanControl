@@ -2,7 +2,41 @@
 
 This is a dirty viby steamy FORK of https://github.com/0x1F9F1/LegionFanControl
 
+```text
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║           !!!   EXTREME RISK & DISCLAIMER   !!!              ║
+║         This is NOT a tool for daily or casual use.          ║
+║                                                              ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║   This program grants raw, unfiltered write-access to your   ║
+║   laptop's Embedded Controller (EC). It is a proof-of-concept║
+║   that bypasses all manufacturer-installed thermal logic.    ║
+║                                                              ║
+║   Let it be known: The author, after its creation, deemed    ║
+║   it too volatile and dangerous for regular operation and    ║
+║   **DOES NOT USE THIS TOOL ON THEIR OWN MACHINE.**           ║
+║                                                              ║
+║   This repository exists for **research purposes only**, or  ║
+║   for madmen who fully understand the consequences and wish  ║
+║   to experiment with their hardware's absolute limits.       ║
+║                                                              ║
+║   You are solely responsible for any damage, permanent or    ║
+║   otherwise, that may result from its use. You have been     ║
+║   warned.                                                    ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════╗
+THE TEMPERATURE STARTS SLOWLY RISING WITH THE FANS TURNED OFF!
+I HAVE NO IDEA ON WHICH TEMPERATURE IT"S GOING TO STABILIZE SO
+                IT MAY FRY YOUR LAPTOP!!
+╚══════════════════════════════════════════════════════════════╝
+(if you won't be fast enough to revert changes, which option this program conveniently provides...)
+```
 NEITHER I NOR GEMINI ASSUME ANY RESPONSIBILITY WHATSOEVER
+
+
 
 This makes your Legion Pro 5 16IRX8 (SO IT IS GENERATION 8 year 2023) finally shut the fans off at low temps. Perfect with lenovo legion toolkit custom profiles and disabled intel boost. Save the health of your fans today!
 
@@ -32,7 +66,5 @@ const std::vector<FanCurvePoint> silentCurve = {
     ↑    ↑
     ↑    ↑ 
     put more or less zeroes in these two columns
-
-
 
 
