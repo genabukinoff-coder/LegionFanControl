@@ -50,7 +50,7 @@ at
 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Config
 
 you can tweak the values at LegionFanControl.cpp line 124:
-
+```code
 const std::vector<FanCurvePoint> silentCurve = {
     {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},               // Level 0: OFF
     {0, 0, 5, 5, 67, 63, 53, 50, 45, 35},            // Level 1: OFF
@@ -66,5 +66,5 @@ const std::vector<FanCurvePoint> silentCurve = {
     ↑    ↑
     ↑    ↑ 
     put more or less zeroes in these two columns
-
+```
 
