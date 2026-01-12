@@ -50,6 +50,13 @@ HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Config
 
 you can tweak the values in the .ini file.
 
+Available options:
+  [1] Apply CUSTOM Fan Curve (from fancurve.ini)
+  [2] Restore DEFAULT Fan Curve
+  [3] READ and Display Current Fan Curve from EC
+  [4] DUMP Full EC Memory to ec_dump.txt
+  [5] Exit
+
 the default curve in the source:
 ```code
 const std::vector<FanCurvePoint> defaultCurve = {
