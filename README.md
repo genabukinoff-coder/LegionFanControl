@@ -28,11 +28,11 @@ This is a dirty viby steamy FORK of https://github.com/0x1F9F1/LegionFanControl
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 ╔══════════════════════════════════════════════════════════════╗
-THE TEMPERATURE STARTS SLOWLY RISING WITH THE FANS TURNED OFF!
-I HAVE NO IDEA ON WHICH TEMPERATURE IT"S GOING TO STABILIZE SO
+THE TEMPERATURE START TO SLOWLY RISE WITH THE FANS TURNED OFF!
+I HAVE NO IDEA ON WHAT TEMPERATURE IT'S GOING TO STABILIZE THEREFORE
                 IT MAY FRY YOUR LAPTOP!!
 ╚══════════════════════════════════════════════════════════════╝
-(if you won't be fast enough to revert changes, which option this program conveniently provides...)
+(if you won't be fast enough to revert the changes, which option this program conveniently provides...)
 ```
 NEITHER I NOR GEMINI ASSUME ANY RESPONSIBILITY WHATSOEVER
 
