@@ -18,9 +18,7 @@ This is a dirty viby steamy FORK of https://github.com/0x1F9F1/LegionFanControl
 ║   it too volatile and dangerous for regular operation and    ║
 ║   **DOES NOT USE THIS TOOL ON THEIR OWN MACHINE.**           ║
 ║                                                              ║
-║   This repository exists for **research purposes only**, or  ║
-║   for madmen who fully understand the consequences and wish  ║
-║   to experiment with their hardware's absolute limits.       ║
+║   This repository exists for **research purposes only**.     ║
 ║                                                              ║
 ║   You are solely responsible for any damage, permanent or    ║
 ║   otherwise, that may result from its use. You have been     ║
@@ -28,43 +26,46 @@ This is a dirty viby steamy FORK of https://github.com/0x1F9F1/LegionFanControl
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 ╔══════════════════════════════════════════════════════════════╗
-THE TEMPERATURE START TO SLOWLY RISE WITH THE FANS TURNED OFF!
-I HAVE NO IDEA ON WHAT TEMPERATURE IT'S GOING TO STABILIZE THEREFORE
-                IT MAY FRY YOUR LAPTOP!!
+
+THE TEMPERATURE START TO SLOWLY RISE IF YOU TURN OFF THE FANS COMPLETELY!
+
+At ~75 degrees CPU experiences heavy throttling making the laptop unusable, even with cooling stand and everything tweaked with lenovo legion toolkit so I haven't been able to use the laptop without the fans unfortunately, which was the point of the project.
+
 ╚══════════════════════════════════════════════════════════════╝
-(if you won't be fast enough to revert the changes, which option this program conveniently provides...)
 ```
 NEITHER I NOR GEMINI ASSUME ANY RESPONSIBILITY WHATSOEVER
 
 
 
-This makes your Legion Pro 5 16IRX8 (SO IT IS GENERATION 8 year 2023) finally shut the fans off at low temps. Perfect with lenovo legion toolkit custom profiles and disabled intel boost. Save the health of your fans today!
+This program allows you to tweak the fans of Legion Pro 5 16IRX8 (SO IT IS GENERATION 8 year 2023).
 
 All thanks to the previous author, to SmokelessCPUv2, Zandyz, and Underv0lti, and to Gemini, guided by my wise nudges.
 
-//the whole program is a simple, single .cpp file so feel free to inspect/build it yourself
+//The whole program is a simple, single .cpp file so feel free to inspect/build it yourself
 
-//If you don't know how to build the project don't worry I can't create a standalone .exe too, we're all learning... Just download the free Visual studio open the .sln and press the Green Button. Also you may need to disable Core Isolation/Memory Integrity and change this registry key 
+You may need to disable Core Isolation/Memory Integrity and change this registry key 
 VulnerableDriverBlocklistEnable to 0 
 at
 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CI\Config
 
-you can tweak the values at LegionFanControl.cpp line 124:
+you can tweak the values in the .ini file.
+
+the default curve in the source:
 ```code
-const std::vector<FanCurvePoint> silentCurve = {
-    {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},               // Level 0: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 45, 35},            // Level 1: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 50, 40},            // Level 2: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 127, 45},           // Level 3: OFF
-    {0, 0, 2, 2, 72, 63, 56, 50, 127, 127},        // Level 4: Fans ON at 72C
-    {0, 0, 2, 2, 77, 67, 59, 53, 127, 127},        // ... subsequent levels are same as default
-    {29, 29, 2, 2, 80, 72, 65, 56, 127, 127},
-    {34, 35, 2, 2, 84, 77, 68, 62, 127, 127},
-    {37, 37, 2, 2, 88, 80, 75, 65, 127, 127},
-    {44, 46, 2, 2, 91, 84, 85, 69, 127, 127},
-    {54, 54, 2, 2, 127, 88, 127, 81, 127, 127}
-    ↑    ↑
-    ↑    ↑ 
-    put more or less zeroes in these two columns
+const std::vector<FanCurvePoint> defaultCurve = {
+    {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},               // Level 0 (from 0xDF00)
+    {17, 17, 5, 5, 67, 63, 53, 50, 45, 35},          // Level 1 (from 0xDF10)
+    {19, 19, 5, 5, 67, 63, 53, 50, 50, 40},          // Level 2 (from 0xDF20)
+    {21, 21, 5, 5, 67, 63, 53, 50, 127, 45},         // Level 3 (from 0xDF30)
+    {23, 22, 2, 2, 72, 63, 56, 50, 127, 127},        // Level 4 (from 0xDF40)
+    {25, 27, 2, 2, 77, 67, 59, 53, 127, 127},        // Level 5 (from 0xDF50)
+    {29, 29, 2, 2, 80, 72, 65, 56, 127, 127},        // Level 6 (from 0xDF60)
+    {34, 35, 2, 2, 84, 77, 68, 62, 127, 127},        // Level 7 (from 0xDF70)
+    {37, 37, 2, 2, 88, 80, 75, 65, 127, 127},        // Level 8 (from 0xDF80)
+    {44, 46, 2, 2, 91, 84, 85, 69, 127, 127},        // Level 9 (from 0xDF90)
+    {54, 54, 2, 2, 127, 88, 127, 81, 127, 127}       // Level 10 (from 0xDFA0)};  
+    ↑    ↑               ↑ 
+    ↑    ↑               ↑ 
+    the values in the first two columns are the speed of the fans at certain temperatures, the value in the third column is the temperature
 ```
 

@@ -1,27 +1,4 @@
 /*
-   PM-port(62/66)
-   KBC-port(60/64)
-   EC-port(2E/2F or 4E/4F)
-*/
-
-#include <Windows.h>
-
-#include "winio.h"
-#pragma comment(lib, "WinIox64.lib")
-
-//==========================The hardware port to read/write function================================
-#define READ_PORT(port, data2) GetPortVal(port, &data2, 1);
-#define WRITE_PORT(port, data2) SetPortVal(port, data2, 1)
-//==================================================================================================
-
-//======================================== PM channel ==============================================
-#define PM_STATUS_PORT66 0x66
-#define PM_CMD_PORT66 0x66
-#define PM_DATA_PORT62 0x62
-#define PM_OBF 0x01
-#define PM_IBF 0x02
-//------------wait EC PM channel port66 output buffer full-----/
-/*
  * =================================================================================
  * Legion EC Writer - A tool to modify the fan curve on ITE-5507 ECs
  * =================================================================================
@@ -45,10 +22,46 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <vector>
+#include <string>
 #include <conio.h> // For _getch()
 
 #include "winio.h"
 #pragma comment(lib, "WinIox64.lib")
+
+//==========================The hardware port to read/write function================================
+#define READ_PORT(port, data2) GetPortVal(port, &data2, 1);
+#define WRITE_PORT(port, data2) SetPortVal(port, data2, 1)
+//==================================================================================================
+
+//================================ KBC/PM Channel Functions =================================
+// Using PM Channel (62/66) for standard EC RAM access
+#define PM_STATUS_PORT66 0x66
+#define PM_CMD_PORT66 0x66
+#define PM_DATA_PORT62 0x62
+#define PM_OBF 0x01
+#define PM_IBF 0x02
+
+void Wait_PM_IBE(void) {
+    DWORD data;
+    do { READ_PORT(PM_STATUS_PORT66, data); } while (data & PM_IBF);
+}
+
+void Wait_PM_OBF(void) {
+    DWORD data;
+    do { READ_PORT(PM_STATUS_PORT66, data); } while (!(data & PM_OBF));
+}
+
+BYTE EC_ReadByte_PM(BYTE index) {
+    DWORD data;
+    Wait_PM_IBE();
+    WRITE_PORT(PM_CMD_PORT66, 0x80); // Read command
+    Wait_PM_IBE();
+    WRITE_PORT(PM_DATA_PORT62, index);
+    Wait_PM_OBF();
+    READ_PORT(PM_DATA_PORT62, data);
+    return (BYTE)data;
+}
+//=======================================================================================
 
  // --- Low-Level I/O Port Functions ---
 UINT8 EC_ADDR_PORT = 0x4E;
@@ -105,7 +118,7 @@ struct FanCurvePoint {
 // Base address for the fan curve table in your EC dump
 const unsigned short FAN_CURVE_BASE_ADDR = 0xDF00;
 
-// Hardcoded DEFAULT fan curve from your ec_dump.txt
+// Hardcoded DEFAULT fan curve (discovered from EC dump)
 const std::vector<FanCurvePoint> defaultCurve = {
     {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},               // Level 0 (from 0xDF00)
     {17, 17, 5, 5, 67, 63, 53, 50, 45, 35},          // Level 1 (from 0xDF10)
@@ -120,20 +133,123 @@ const std::vector<FanCurvePoint> defaultCurve = {
     {54, 54, 2, 2, 127, 88, 127, 81, 127, 127}       // Level 10 (from 0xDFA0)
 };
 
-// Custom SILENT fan curve
-const std::vector<FanCurvePoint> silentCurve = {
-    {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},               // Level 0: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 45, 35},            // Level 1: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 50, 40},            // Level 2: OFF
-    {0, 0, 5, 5, 67, 63, 53, 50, 127, 45},           // Level 3: OFF
-    {0, 0, 2, 2, 72, 63, 56, 50, 127, 127},        // Level 4: Fans ON at 72C
-    {0, 0, 2, 2, 77, 67, 59, 53, 127, 127},        // ... subsequent levels are same as default
-    {0, 0, 2, 2, 80, 72, 65, 56, 127, 127},
-    {0, 0, 2, 2, 84, 77, 68, 62, 127, 127},
-    {0, 0, 2, 2, 88, 80, 75, 65, 127, 127},
-    {44, 46, 2, 2, 91, 84, 85, 69, 127, 127},
-    {54, 54, 2, 2, 127, 88, 127, 81, 127, 127}
-};
+// Custom fan curve (loaded from fancurve.ini)
+std::vector<FanCurvePoint> customCurve;
+
+const char* INI_FILENAME = "fancurve.ini";
+
+// Loads custom fan curve from INI file
+// Format: {Fan1_RPM, Fan2_RPM, Accel, Decel, CPU_Max, CPU_Min, GPU_Max, GPU_Min, HST_Max, HST_Min}, // comment
+// Returns true if successful, false if file not found or error
+bool LoadCustomCurveFromINI() {
+    customCurve.clear();
+
+    FILE* iniFile;
+    if (fopen_s(&iniFile, INI_FILENAME, "r") != 0) {
+        return false;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), iniFile)) {
+        // Skip comments and empty lines
+        if (line[0] == ';' || line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
+            continue;
+        }
+
+        // Look for lines starting with '{'
+        char* p = line;
+        while (*p == ' ' || *p == '\t') p++;  // Skip leading whitespace
+
+        if (*p != '{') continue;
+        p++;  // Skip '{'
+
+        // Parse 10 comma-separated values
+        int values[10] = {0};
+        int count = 0;
+
+        while (count < 10 && *p) {
+            // Skip whitespace
+            while (*p == ' ' || *p == '\t') p++;
+
+            // Parse number
+            int val = 0;
+            bool negative = false;
+            if (*p == '-') { negative = true; p++; }
+
+            if (*p >= '0' && *p <= '9') {
+                while (*p >= '0' && *p <= '9') {
+                    val = val * 10 + (*p - '0');
+                    p++;
+                }
+                values[count++] = negative ? -val : val;
+
+                // Skip to next value (comma or closing brace)
+                while (*p == ' ' || *p == '\t') p++;
+                if (*p == ',') p++;
+            } else {
+                break;  // Invalid character
+            }
+        }
+
+        // If we got all 10 values, add this level
+        if (count == 10) {
+            FanCurvePoint point;
+            point.Fan1_RPM = (uint8_t)values[0];
+            point.Fan2_RPM = (uint8_t)values[1];
+            point.Accel    = (uint8_t)values[2];
+            point.Decel    = (uint8_t)values[3];
+            point.CPU_Max  = (uint8_t)values[4];
+            point.CPU_Min  = (uint8_t)values[5];
+            point.GPU_Max  = (uint8_t)values[6];
+            point.GPU_Min  = (uint8_t)values[7];
+            point.HST_Max  = (uint8_t)values[8];
+            point.HST_Min  = (uint8_t)values[9];
+            customCurve.push_back(point);
+        }
+    }
+
+    fclose(iniFile);
+    return customCurve.size() > 0;
+}
+
+// Creates a default INI file with the current custom curve values
+void CreateDefaultINI() {
+    FILE* iniFile;
+    if (fopen_s(&iniFile, INI_FILENAME, "w") != 0) {
+        printf("ERROR: Could not create %s\n", INI_FILENAME);
+        return;
+    }
+
+    fprintf(iniFile, "; Legion Fan Curve Configuration\n");
+    fprintf(iniFile, "; Format: {Fan1_RPM, Fan2_RPM, Accel, Decel, CPU_Max, CPU_Min, GPU_Max, GPU_Min, HST_Max, HST_Min}\n");
+    fprintf(iniFile, "; Fan RPM values are in units of 100 (e.g., 17 = 1700 RPM)\n");
+    fprintf(iniFile, "; Temperature values are in Celsius. Use 127 to disable a threshold.\n");
+    fprintf(iniFile, "; Set Fan1_RPM and Fan2_RPM to 0 for fans OFF at that level.\n\n");
+
+    // Write default silent curve values in C++ array format
+    const int d[11][10] = {
+        {0, 0, 5, 5, 67, 0, 53, 0, 40, 0},
+        {0, 0, 5, 5, 67, 63, 53, 50, 45, 35},
+        {0, 0, 5, 5, 67, 63, 53, 50, 50, 40},
+        {0, 0, 5, 5, 67, 63, 53, 50, 127, 45},
+        {23, 22, 2, 2, 72, 63, 56, 50, 127, 127},
+        {25, 27, 2, 2, 77, 67, 59, 53, 127, 127},
+        {29, 29, 2, 2, 80, 72, 65, 56, 127, 127},
+        {34, 35, 2, 2, 84, 77, 68, 62, 127, 127},
+        {37, 37, 2, 2, 88, 80, 75, 65, 127, 127},
+        {44, 46, 2, 2, 91, 84, 85, 69, 127, 127},
+        {54, 54, 2, 2, 127, 88, 127, 81, 127, 127}
+    };
+
+    for (int i = 0; i < 11; i++) {
+        fprintf(iniFile, "{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d},  // Level %d\n",
+            d[i][0], d[i][1], d[i][2], d[i][3], d[i][4],
+            d[i][5], d[i][6], d[i][7], d[i][8], d[i][9], i);
+    }
+
+    fclose(iniFile);
+    printf("Created default %s\n", INI_FILENAME);
+}
 
 // --- Core Functions ---
 
@@ -184,6 +300,75 @@ void ReadAndDisplayCurrentCurve() {
     printf("----------------------------------------------------------------------\n");
 }
 
+// Dumps the full EC memory to ec_dump.txt
+void DumpECMemory() {
+    printf("\n--- EC Memory Dumper ---\n");
+
+    // Open the output file
+    FILE* dumpFile;
+    if (fopen_s(&dumpFile, "ec_dump.txt", "w") != 0) {
+        printf("ERROR: Could not create ec_dump.txt.\n");
+        return;
+    }
+    printf("Output file 'ec_dump.txt' created.\n");
+
+    // --- Step 1: Identify the Embedded Controller ---
+    printf("Reading EC identification...\n");
+    fprintf(dumpFile, "--- Embedded Controller Information ---\n");
+
+    uint8_t ec_id1 = ECRamReadExt(0x2000);
+    uint8_t ec_id2 = ECRamReadExt(0x2001);
+    uint8_t ec_ver = ECRamReadExt(0x2002);
+
+    printf("EC Chip ID: ITE-%02X%02X\n", ec_id1, ec_id2);
+    printf("EC Firmware Version: %u\n", ec_ver);
+    fprintf(dumpFile, "EC Chip ID: ITE-%02X%02X\n", ec_id1, ec_id2);
+    fprintf(dumpFile, "EC Firmware Version: %u\n", ec_ver);
+    fprintf(dumpFile, "--------------------------------------\n\n");
+
+    // --- Step 2: Dump the Standard 256-byte EC RAM (PM Channel) ---
+    printf("Dumping standard 256-byte EC RAM (0x00-0xFF)...\n");
+    fprintf(dumpFile, "--- Standard EC RAM Dump (256 Bytes, via PM Channel) ---\n");
+    fprintf(dumpFile, "Offset | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
+    fprintf(dumpFile, "-------|-------------------------------------------------\n");
+
+    for (int i = 0; i <= 0xFF; ++i) {
+        if (i % 16 == 0) {
+            fprintf(dumpFile, "%02X     | ", i);
+        }
+        fprintf(dumpFile, "%02X ", EC_ReadByte_PM((BYTE)i));
+        if (i % 16 == 15) {
+            fprintf(dumpFile, "\n");
+        }
+    }
+    fprintf(dumpFile, "\n\n");
+
+    // --- Step 3: Dump the Full 64KB Extended EC RAM (Direct I/O) ---
+    printf("Dumping full 64KB extended EC RAM (0x0000-0xFFFF). This will take a moment...\n");
+    fprintf(dumpFile, "--- Full Extended EC RAM Dump (64KB, via Direct I/O) ---\n");
+    fprintf(dumpFile, "Address  | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
+    fprintf(dumpFile, "---------|-------------------------------------------------\n");
+
+    for (int i = 0; i <= 0xFFFF; ++i) {
+        if (i % 16 == 0) {
+            fprintf(dumpFile, "0x%04X   | ", i);
+        }
+        fprintf(dumpFile, "%02X ", ECRamReadExt((unsigned short)i));
+        if (i % 16 == 15) {
+            fprintf(dumpFile, "\n");
+            // Print progress to console
+            if (i % 256 == 255) {
+                printf("\rProgress: %d%%", (i * 100) / 0xFFFF);
+            }
+        }
+    }
+    printf("\rProgress: 100%%\n");
+
+    // --- Cleanup ---
+    fclose(dumpFile);
+    printf("\nDump complete. All data saved to ec_dump.txt.\n");
+}
+
 
 // --- Main Program Loop ---
 int main() {
@@ -203,10 +388,11 @@ int main() {
         printf("======================================\n\n");
         printf("WARNING: This is a low-level tool. Use responsibly.\n\n");
         printf("Select an option:\n");
-        printf("  [1] Apply SILENT Fan Curve (Fans off at low temps)\n");
-        printf("  [2] Restore DEFAULT Fan Curve (From your dump)\n");
+        printf("  [1] Apply CUSTOM Fan Curve (from fancurve.ini)\n");
+        printf("  [2] Restore DEFAULT Fan Curve\n");
         printf("  [3] READ and Display Current Fan Curve from EC\n");
-        printf("  [4] Exit\n\n");
+        printf("  [4] DUMP Full EC Memory to ec_dump.txt\n");
+        printf("  [5] Exit\n\n");
         printf("Your choice: ");
 
         char choice = _getch();
@@ -214,9 +400,16 @@ int main() {
 
         switch (choice) {
         case '1':
-            printf("Applying SILENT fan curve...\n");
-            WriteFanCurve(silentCurve);
-            printf("\nSILENT curve applied successfully!\n");
+            if (LoadCustomCurveFromINI()) {
+                printf("Loaded %zu levels from %s\n", customCurve.size(), INI_FILENAME);
+                printf("Applying CUSTOM fan curve...\n");
+                WriteFanCurve(customCurve);
+                printf("\nCUSTOM curve applied successfully!\n");
+            } else {
+                printf("Could not find %s - creating default...\n", INI_FILENAME);
+                CreateDefaultINI();
+                printf("Please edit %s and try again.\n", INI_FILENAME);
+            }
             break;
         case '2':
             printf("Applying DEFAULT fan curve...\n");
@@ -227,6 +420,9 @@ int main() {
             ReadAndDisplayCurrentCurve();
             break;
         case '4':
+            DumpECMemory();
+            break;
+        case '5':
             printf("Exiting...\n");
             ShutdownWinIo();
             return 0;
